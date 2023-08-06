@@ -13,10 +13,10 @@ int main() {
     std::cout << "This is a \'feature detection and matching\' script." << std::endl; 
 
     // std::string image_path = cv::samples::findFile("car.jpg");
-    std::string img_path_1 = "/home/hamdaan/Datasets/data_odometry_gray/dataset/sequences/00/image_0/000080.png";
-    std::string img_path_2 = "/home/hamdaan/Datasets/data_odometry_gray/dataset/sequences/00/image_1/000080.png";
-    std::string img_path_3 = "/home/hamdaan/Datasets/data_odometry_gray/dataset/sequences/00/image_0/000081.png";
-    std::string img_path_4 = "/home/hamdaan/Datasets/data_odometry_gray/dataset/sequences/00/image_1/000081.png";
+    std::string img_path_1 = "/home/hamdaan/Datasets/KITTI/data_odometry_gray/dataset/sequences/00/image_0/000080.png";
+    std::string img_path_2 = "/home/hamdaan/Datasets/KITTI/data_odometry_gray/dataset/sequences/00/image_1/000080.png";
+    std::string img_path_3 = "/home/hamdaan/Datasets/KITTI/data_odometry_gray/dataset/sequences/00/image_0/000081.png";
+    std::string img_path_4 = "/home/hamdaan/Datasets/KITTI/data_odometry_gray/dataset/sequences/00/image_1/000081.png";
 
 
     // cv::Mat img = cv::imread(image_path, cv::IMREAD_COLOR);

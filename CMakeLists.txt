@@ -35,3 +35,13 @@ target_link_libraries(
     stereo3Dto3D
     ${OpenCV_LIBRARIES}
 )
+
+add_executable(
+    orb_feature_match
+    examples/orb_feature_matching.cpp 
+)
+
+target_link_libraries(
+    orb_feature_match
+    ${OpenCV_LIBRARIES}
+)

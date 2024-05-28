@@ -1,6 +1,6 @@
 #include <iostream>
-#include <Eigen/Dense> 
-#include <Eigen/SVD>
+#include <eigen3/Eigen/Dense> 
+#include <eigen3/Eigen/SVD>
 #include <opencv2/core/types.hpp>
 #include <cstdlib>
 #include <ctime> 
@@ -141,7 +141,7 @@ Eigen::MatrixXd computeEssential8point(Eigen::Matrix<double, 8, 3>* points0, Eig
     // Step 3: Perform SVD of A. Last singular vector is an approximation e. // 
     Eigen::JacobiSVD<Eigen::Matrix<double, 8, 9>> svd;
     svd.compute(A, Eigen::ComputeFullV | Eigen::ComputeFullU); 
-    auto e_norm = svd.matrixV().col(8); 
+    Eigen::VectorXd e_norm = svd.matrixV().col(8); 
     Eigen::Matrix3d E_norm = e_norm.reshaped(3,3).transpose(); 
 
     // Step 4: Compute E from E_norm. Szeliski page 706 // 

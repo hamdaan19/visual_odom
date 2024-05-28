@@ -4,7 +4,8 @@ project(vo)
 set (CMAKE_CXX_FLAGS "-lstdc++fs -std=c++17")
 
 find_package(OpenCV 4.6.0 REQUIRED)
-find_package(Eigen3 3.3.7 REQUIRED)
+find_package(Eigen3 3.3.4 EXACT REQUIRED)
+find_package(Ceres 2.2.0 EXACT REQUIRED)
 
 include_directories(
     include
@@ -25,16 +26,18 @@ target_link_libraries(
     ${OpenCV_LIBRARIES}
 )
 
-add_executable(
-    stereo3Dto3D
-    src/stereo3Dto3D.cpp
-    src/triangulate.cpp
-)
+# add_executable(
+#     stereo3Dto3D
+#     src/stereo3Dto3D.cpp
+#     src/triangulate.cpp
+# )
 
-target_link_libraries(
-    stereo3Dto3D
-    ${OpenCV_LIBRARIES}
-)
+# target_link_libraries(
+#     stereo3Dto3D
+#     ${OpenCV_LIBRARIES}
+#     ${EIGEN3_LIBS}
+# )
+
 
 add_executable(
     orb_feature_match
@@ -45,3 +48,14 @@ target_link_libraries(
     orb_feature_match
     ${OpenCV_LIBRARIES}
 )
+
+add_executable(
+    curve_fitting_ceres 
+    examples/curve_fitting_ceres.cpp
+)
+target_link_libraries(
+    curve_fitting_ceres 
+    ${CERES_LIBRARIES} 
+    ${EIGEN3_LIBS}
+)
+# add_dependencies(gsw_ceres ${bspline_traj_planner_EXPORTED_TARGETS})

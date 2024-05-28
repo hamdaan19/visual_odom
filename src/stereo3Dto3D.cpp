@@ -4,7 +4,7 @@
 #include <opencv4/opencv2/xfeatures2d.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv4/opencv2/imgproc.hpp>
-#include <Eigen/Dense>
+#include <eigen3/Eigen/Dense>
 #include <iostream>
 #include <filesystem>
 #include <iomanip>

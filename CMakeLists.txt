@@ -3,12 +3,16 @@ project(vo)
 
 set (CMAKE_CXX_FLAGS "-lstdc++fs -std=c++17")
 
+set(CMAKE_BUILD_TYPE Release)
+
 find_package(OpenCV 4.6.0 REQUIRED)
 find_package(Eigen3 3.3.4 EXACT REQUIRED)
 find_package(Ceres 2.2.0 EXACT REQUIRED)
 
 include_directories(
     include
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/examples
     ${OpenCV_INCLUDE_DIRS}
     ${EIGEN3_INCLUDE_DIR}
 )
@@ -59,3 +63,13 @@ target_link_libraries(
     ${EIGEN3_LIBS}
 )
 # add_dependencies(gsw_ceres ${bspline_traj_planner_EXPORTED_TARGETS})
+
+add_executable(
+    bundle_adjuster_ceres 
+    examples/bundle_adjuster_ceres.cpp
+)
+target_link_libraries(
+    bundle_adjuster_ceres 
+    ${CERES_LIBRARIES} 
+    ${EIGEN3_LIBS}
+)

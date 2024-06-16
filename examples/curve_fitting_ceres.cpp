@@ -86,8 +86,8 @@ class DataPointResidual {
 
         // Templated operator()
         template <typename T> 
-        bool operator() (const T* const m, const T* const c, T* e) const {
-            e[0] = y_ - exp( m[0]*x_ + c[0] ); 
+        bool operator() (const T* const parameters, T* e) const {
+            e[0] = y_ - exp( parameters[0]*x_ + parameters[1] ); 
             return true; 
         }
 
@@ -103,27 +103,36 @@ int main(int argc, char** argv) {
     google::InitGoogleLogging(argv[0]); 
 
     // Setting the intial values for the parameters that need to be estimated
-    const double initial_m = 0.0;
-    const double initial_c = 0.0;
+    // const double initial_m = 0.0;
+    // const double initial_c = 0.0;
 
-    double m = initial_m; 
-    double c = initial_c; 
+    const double initial_param[2] = {0.0, 0.0}; 
+
+    double param[2] = {initial_param[0], initial_param[1]}; 
+    // double m = initial_m; 
+    // double c = initial_c; 
 
     // Creating the NLLS problem
     ceres::Problem problem;
 
     // Adding each observation as a residual term in the NLLS objective. 
     // This uses auto-differentiation to obtain the derivative (jacobian).
+
+    // Problem::AddParameterBlock() explicitly adds a parameter block to the Problem. 
+    // Optionally it allows the user to associate a Manifold object with the parameter 
+    // block too.
+    problem.AddParameterBlock(param, 2);
+
     for (int i = 0; i < kNumObservations; i++) {
 
         // Creating the residual term as a cost function
-        ceres::CostFunction *residual_function = new ceres::AutoDiffCostFunction<DataPointResidual, 1, 1, 1>(
+        ceres::CostFunction *residual_function = new ceres::AutoDiffCostFunction<DataPointResidual, 1, 2>(
             new DataPointResidual(data[2 * i], data[2 * i + 1]));
 
         // Adding the residual term to the NLLS problem
         // Note that any variable (in this case m and c) passed to the following AddResidualBlock() function
         // are the variables that will be optimized. 
-        problem.AddResidualBlock(residual_function, nullptr, &m, &c);
+        problem.AddResidualBlock(residual_function, nullptr, param);
     }
 
     // Setting solver options
@@ -140,10 +149,12 @@ int main(int argc, char** argv) {
     std::cout << summary.BriefReport() << "\n";
 
     // Initial Values of parameters
-    std::cout << "Initial m: " << initial_m << " c: " << initial_c << "\n";
+    std::cout << "Initial m: " << initial_param[0] << " c: " << initial_param[1] << "\n";
 
     // Final values of parameters after optimization
-    std::cout << "Final   m: " << m << " c: " << c << "\n";
+    std::cout << "Final   m: " << param[0] << " c: " << param[1] << "\n";
+
+    std::cout << "--------------------------------------\n End of Program \n-------------------------------------- \n"; 
 
     return 0; 
 

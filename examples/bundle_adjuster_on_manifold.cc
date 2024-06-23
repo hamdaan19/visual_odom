@@ -42,6 +42,8 @@
 #include "ceres/ceres.h"
 #include "ceres/rotation.h"
 
+#include "eigen3/Eigen/Dense"
+
 // Read a Bundle Adjustment in the Large dataset.
 class BALProblem
 {
@@ -234,6 +236,40 @@ int main(int argc, char **argv)
     ceres::Solver::Summary summary;
     ceres::Solve(options, &problem, &summary);
     std::cout << summary.FullReport() << "\n";
+
+    // Playing around with code
+
+    for (int i = 3; i < 8; i++) {
+        double *myArray = bal_problem.mutable_camera_for_observation(i);
+
+        // Converting Angle-Axis rotation to rotation matrix
+        double angleAxis[3] = {*myArray, *(myArray + 1), *(myArray + 2)};
+        double Rot[9];
+
+        ceres::AngleAxisToRotationMatrix(angleAxis, Rot);
+
+        for (int j = 0; j < 9; j++)
+        {
+            std::cout << *(myArray + j) << " ";
+        }
+        std::cout << "Rotation Matrix:\n"; 
+        for (int j = 0; j < 9; j++)
+        {
+            std::cout << Rot[j] << " ";
+        }
+
+        Eigen::Matrix<double, 3, 3, Eigen::RowMajor> R; 
+        R << 
+        Rot[0], Rot[3], Rot[6], 
+        Rot[1], Rot[4], Rot[7], 
+        Rot[2], Rot[5], Rot[8]; 
+
+        std::cout << "\nR: \n" << R; 
+
+        std::cout << "\n\n";
+    }
+
+
 
     return 0;
 }

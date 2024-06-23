@@ -76,15 +76,15 @@ target_link_libraries(
     ${EIGEN3_LIBS}
 )
 
-# add_executable(
-#     bundle_adjuster_on_manifold
-#     examples/bundle_adjuster_on_manifold.cc
-# )
-# target_link_libraries(
-#     bundle_adjuster_on_manifold 
-#     ${CERES_LIBRARIES} 
-#     ${EIGEN3_LIBS}
-# )
+add_executable(
+    bundle_adjuster_on_manifold
+    examples/bundle_adjuster_on_manifold.cc
+)
+target_link_libraries(
+    bundle_adjuster_on_manifold 
+    ${CERES_LIBRARIES} 
+    ${EIGEN3_LIBS}
+)
 
 add_executable(
     sophus_basics

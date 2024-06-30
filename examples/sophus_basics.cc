@@ -61,6 +61,16 @@ int main(int argc, char** argv) {
     update_se3.setZero(); 
     update_se3(0,0) = 1e-4;
     Sophus::SE3d SE3_updated = Sophus::SE3d::exp(update_se3) * SE3_Rt;
-    std::cout << "SE3 updated:\n" << SE3_updated.matrix() << "\n"; 
+    std::cout << "SE3 updated:\n" << SE3_updated.matrix() << "\n";
+
+    // Some other functions
+    std::cout << "Number of parameters in SO(3): " << Sophus::SO2d::num_parameters << "\n";
+    std::cout << "Number of parameters in so(3): " << Sophus::SO2d::DoF << "\n";  
+
+    // Playing around
+    double quat[4] = {0.15062098347108197, 0.5321941415978229, -0.6137303006501686, 0.5633984673843319}; // Quaternion format: x, y, z, w
+    Eigen::Map<Sophus::SO3d> rot(quat); // Mapping a quaternion rotation from double* type to Sophus::SO3d type
+
+    std::cout << "Matrix:\n" << rot.matrix() << "\n"; 
 
 }

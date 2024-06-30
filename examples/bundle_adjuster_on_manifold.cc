@@ -44,6 +44,19 @@
 
 #include "eigen3/Eigen/Dense"
 
+// Manifold Functor
+// struct SpecialOrthogonalFunctor {
+//     template <typename T>
+//     bool Plus(const T* x, const T* delta, T* x_plus_delta) const {
+
+//     }
+
+//     template <typename T> 
+//     bool Minus(const T* y, const T* x, T* y_minus_x) {
+
+//     }
+// };
+
 // Read a Bundle Adjustment in the Large dataset.
 class BALProblem
 {
@@ -54,6 +67,9 @@ public:
         delete[] camera_index_;
         delete[] observations_;
         delete[] parameters_;
+        delete[] camera_intrinsics_;
+        delete[] camera_positions_; 
+        delete[] camera_rotations_; 
     }
 
     int num_observations() const { return num_observations_; }
@@ -68,6 +84,18 @@ public:
     double *mutable_point_for_observation(int i)
     {
         return mutable_points() + point_index_[i] * 3;
+    }
+
+    double* camera_rotation(int i) {
+        return camera_rotations_ + camera_index_[i] * 9; 
+    }
+
+    double* camera_translation(int i) {
+        return camera_positions_ + camera_index_[i] * 3; 
+    }
+
+    double* camera_intrinsic(int i) {
+        return camera_intrinsics_ + camera_index_[i] * 3; 
     }
 
     bool LoadFile(const char *filename)
@@ -106,6 +134,28 @@ public:
         {
             FscanfOrDie(fptr, "%lf", parameters_ + i);
         }
+
+        // Assigning the sizes of camera arrays
+        camera_rotations_ = new double[9*num_cameras_]; 
+        camera_positions_ = new double[3*num_cameras_]; 
+        camera_intrinsics_ = new double[3*num_cameras_]; 
+
+        // Extracting Camera information and storing it in different arrays
+        for (int i = 0; i < num_cameras_; ++i) {
+            // ------------- Extracting Rotation ------------- // 
+            double angleAxis[3] = {*(parameters_ + 9*i), *(parameters_ + 9*i + 1), *(parameters_ + 9*i + 2)};
+            double rot[9];
+            // Converting Angle Axis to Rotation Matrix
+            ceres::AngleAxisToRotationMatrix(angleAxis, rot);
+            // Copying rotation matrix coefficients into camera_rotations_ array. 
+            std::copy(rot, rot+9, camera_rotations_ + 9*i);
+
+            // ------------- Extracting Translation ------------- //
+            std::copy(parameters_ + 9*i + 3, parameters_ + 9*i + 6, camera_positions_ + 3*i);
+
+            // ------------- Extracting Camera Intrinsics ------------- //
+            std::copy(parameters_ + 9*i + 6, parameters_ + 9*i + 9, camera_intrinsics_ + 3*i); 
+        }
         return true;
     }
 
@@ -129,6 +179,9 @@ private:
     int *camera_index_;
     double *observations_;
     double *parameters_;
+    double *camera_rotations_;   // In rotation matrix form 
+    double *camera_positions_;   // 3D vector
+    double *camera_intrinsics_;  // Includes focal length, f, and distortion parameters - k1 and k2. 
 };
 
 // Templated pinhole camera model for used with Ceres.  The camera is
@@ -239,34 +292,61 @@ int main(int argc, char **argv)
 
     // Playing around with code
 
-    for (int i = 3; i < 8; i++) {
-        double *myArray = bal_problem.mutable_camera_for_observation(i);
+    // for (int i = 3; i < 8; i++) {
+    //     double *myArray = bal_problem.mutable_camera_for_observation(i);
 
-        // Converting Angle-Axis rotation to rotation matrix
-        double angleAxis[3] = {*myArray, *(myArray + 1), *(myArray + 2)};
-        double Rot[9];
+    //     // Converting Angle-Axis rotation to rotation matrix
+    //     double angleAxis[3] = {*myArray, *(myArray + 1), *(myArray + 2)};
+    //     double Rot[9];
 
-        ceres::AngleAxisToRotationMatrix(angleAxis, Rot);
+    //     ceres::AngleAxisToRotationMatrix(angleAxis, Rot);
 
-        for (int j = 0; j < 9; j++)
-        {
-            std::cout << *(myArray + j) << " ";
-        }
-        std::cout << "Rotation Matrix:\n"; 
-        for (int j = 0; j < 9; j++)
-        {
-            std::cout << Rot[j] << " ";
-        }
+    //     for (int j = 0; j < 9; j++)
+    //     {
+    //         std::cout << *(myArray + j) << " ";
+    //     }
+    //     std::cout << "Rotation Matrix:\n"; 
+    //     for (int j = 0; j < 9; j++)
+    //     {
+    //         std::cout << Rot[j] << " ";
+    //     }
 
-        Eigen::Matrix<double, 3, 3, Eigen::RowMajor> R; 
-        R << 
-        Rot[0], Rot[3], Rot[6], 
-        Rot[1], Rot[4], Rot[7], 
-        Rot[2], Rot[5], Rot[8]; 
+    //     Eigen::Matrix<double, 3, 3, Eigen::RowMajor> R; 
+    //     R << 
+    //     Rot[0], Rot[3], Rot[6], 
+    //     Rot[1], Rot[4], Rot[7], 
+    //     Rot[2], Rot[5], Rot[8]; 
 
-        std::cout << "\nR: \n" << R; 
+    //     std::cout << "\nR: \n" << R; 
 
-        std::cout << "\n\n";
+    //     std::cout << "\n\n";
+    // }
+
+    for (int i = 5; i < 10; ++i) {
+        double* param = bal_problem.mutable_camera_for_observation(i);
+        std::cout << "Angle Axis: " << *param << " " << *(param+1) << " " << *(param+2) << "\n"; 
+
+        double* rot = bal_problem.camera_rotation(i);
+        Eigen::Matrix<double, 3, 3, Eigen::RowMajor> R;
+        R <<
+        rot[0], rot[3], rot[6],
+        rot[1], rot[4], rot[7],
+        rot[2], rot[5], rot[8];
+
+        std::cout << "R:\n" << R << "\n"; 
+
+        double* t = bal_problem.camera_translation(i); 
+        Eigen::Map<Eigen::Vector3d> t_(t); 
+        std::cout << "t:\n" << t_ << "\n"; 
+
+
+
+        double* intrinsic_params = bal_problem.camera_intrinsic(i); 
+        double f = *intrinsic_params; 
+        double k1 = *(intrinsic_params+1);
+        double k2 = *(intrinsic_params + 2);
+
+        std::cout << "f: " << f << " k1: " << k1 << " k2: " << k2 << std::endl; 
     }
 
 

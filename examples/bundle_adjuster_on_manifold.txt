@@ -1,0 +1,110 @@
+  // Playing around with code
+
+    // for (int i = 3; i < 8; i++) {
+    //     double *myArray = bal_problem.mutable_camera_for_observation(i);
+
+    //     // Converting Angle-Axis rotation to rotation matrix
+    //     double angleAxis[3] = {*myArray, *(myArray + 1), *(myArray + 2)};
+    //     double Rot[9];
+
+    //     ceres::AngleAxisToRotationMatrix(angleAxis, Rot);
+
+    //     for (int j = 0; j < 9; j++)
+    //     {
+    //         std::cout << *(myArray + j) << " ";
+    //     }
+    //     std::cout << "Rotation Matrix:\n"; 
+    //     for (int j = 0; j < 9; j++)
+    //     {
+    //         std::cout << Rot[j] << " ";
+    //     }
+
+    //     Eigen::Matrix<double, 3, 3, Eigen::RowMajor> R; 
+    //     R << 
+    //     Rot[0], Rot[3], Rot[6], 
+    //     Rot[1], Rot[4], Rot[7], 
+    //     Rot[2], Rot[5], Rot[8]; 
+
+    //     std::cout << "\nR: \n" << R; 
+
+    //     std::cout << "\n\n";
+    // }
+
+    // for (int i = 5; i < 10; ++i) {
+    //     double* param = bal_problem.mutable_camera_for_observation(i);
+    //     std::cout << "Angle Axis: " << *param << " " << *(param+1) << " " << *(param+2) << "\n"; 
+
+    //     double* quat = bal_problem.camera_rotation(i);
+    //     std::cout << "quat: " << *quat << " " << *(quat+1) << " " << *(quat+2) << " " << *(quat+3) << "\n";
+
+    //     Eigen::Map<Sophus::SO3d> SO3d_q(quat);
+    //     std::cout << "Matrix: \n" << SO3d_q.matrix() << "\n";
+
+    //     double* t = bal_problem.camera_translation(i); 
+    //     Eigen::Map<Eigen::Vector3d> t_(t); 
+    //     std::cout << "t:\n" << t_ << "\n"; 
+
+
+
+    //     double* intrinsic_params = bal_problem.camera_intrinsic(i); 
+    //     double f = *intrinsic_params; 
+    //     double k1 = *(intrinsic_params+1);
+    //     double k2 = *(intrinsic_params + 2);
+
+    //     std::cout << "f: " << f << " k1: " << k1 << " k2: " << k2 << std::endl; 
+
+    //     double rotation_vector[3] = {0.0, 0.0, 0.0}; 
+    //     double quaternion[4]; 
+    //     ceres::AngleAxisToQuaternion(rotation_vector, quaternion); 
+    //     std::cout << "quaternion: " << *quaternion << " " << *(quaternion+1) << " " << *(quaternion+2) << " " << *(quaternion+3) << "\n"; 
+
+    //     Eigen::Quaterniond my_quat_1(quaternion);
+    //     Eigen::Quaterniond my_quat_2(*quaternion, *(quaternion + 1), *(quaternion + 2), *(quaternion + 3)); //
+
+        
+    //     Sophus::SO3d SO3d_obj( Eigen::Quaterniond(*quaternion, *(quaternion + 1), *(quaternion + 2), *(quaternion + 3)) );
+    //     std::cout << "SO3d_obj matrix: " << SO3d_obj.matrix() << "\n";
+
+
+    // }
+
+    /*
+    Next Steps:
+    1. Recode the reprojection error class based on the pinhole camera model. 
+    */
+
+    for (int i = 0; i < 20; i++) {
+
+        std::cout << i << ".\n";
+
+        double* q = bal_problem.camera_rotation(i);
+        Eigen::Map<Eigen::Vector4d> q_vec(q); 
+
+        double r[3]; 
+        ceres::QuaternionToAngleAxis(q, r); 
+
+        double* t = bal_problem.camera_translation(i); 
+
+        Eigen::Map<Eigen::Vector3d> t_vec(t);
+        Eigen::Map<Eigen::Vector3d> r_vec(r);
+        Eigen::Map<Eigen::Vector3d> p_vec(bal_problem.mutable_point_for_observation(i));
+
+        std::cout << "r: " << r_vec.transpose() << " t: " << t_vec.transpose() << "\n"; 
+        std::cout << "p: " << p_vec.transpose() << "\n";
+
+    }
+
+    double rotation_vector[3] = {0.0, 0.0, 0.0};
+    double quaternion[4];
+    ceres::AngleAxisToQuaternion(rotation_vector, quaternion);
+    std::cout << "quaternion: " << *quaternion << " " << *(quaternion+1) << " " << *(quaternion+2) << " " << *(quaternion+3) << "\n";
+    double reordered_quat[4] = {quaternion[1], quaternion[2], quaternion[3], quaternion[0]};
+    std::cout << "reordered quaternion: " << *reordered_quat << " " << *(reordered_quat + 1) << " " << *(reordered_quat + 2) << " " << *(reordered_quat + 3) << "\n";
+
+    Eigen::Quaterniond my_quat_1(quaternion);
+    Eigen::Quaterniond my_quat_2(*quaternion, *(quaternion + 1), *(quaternion + 2), *(quaternion + 3)); //
+
+    Sophus::SO3d SO3d_obj( Eigen::Quaterniond(*quaternion, *(quaternion + 1), *(quaternion + 2), *(quaternion + 3)) );
+    Eigen::Map<Sophus::SO3d> s(reordered_quat); 
+    std::cout << "SO3d_obj matrix: \n" << SO3d_obj.matrix() << "\n";
+    std::cout << "s matrix: \n" << s.matrix() << "\n";

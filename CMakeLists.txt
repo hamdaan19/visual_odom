@@ -84,6 +84,7 @@ target_link_libraries(
     bundle_adjuster_on_manifold 
     ${CERES_LIBRARIES} 
     ${EIGEN3_LIBS}
+    Sophus::Sophus
 )
 
 add_executable(

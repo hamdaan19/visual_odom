@@ -34,9 +34,14 @@ int main(int argc, char** argv) {
     std::cout << "vee(hat(so3)): " << Sophus::SO3d::vee( Sophus::SO3d::hat(so3) ).transpose() << "\n"; 
 
     // Applying a perturbation
-    Eigen::Vector3d perturbation_so3(1e-4, 0, 0); // A small perturbation 
+    Eigen::Vector3d perturbation_so3(2, 1e-2, 0); // A small perturbation 
     Sophus::SO3d SO3_perturbed = Sophus::SO3d::exp(perturbation_so3) * SO3_R; 
-    std::cout << "Perturned rotation:\n" << SO3_perturbed.matrix() << "\n"; 
+    std::cout << "Perturbed rotation:\n" << SO3_perturbed.matrix() << "\n";
+
+    Sophus::SO3d delta = SO3_perturbed * SO3_R.inverse();
+    Eigen::Vector3d delta_vector = delta.log(); 
+
+    std::cout << "SO3 delta: " << delta_vector.transpose() << "\n"; 
 
     // Special Euclidean Group - SE3
     Eigen::Vector3d t(1, 0, 0);     // Translation 1 along X axis
@@ -68,7 +73,7 @@ int main(int argc, char** argv) {
     std::cout << "Number of parameters in so(3): " << Sophus::SO2d::DoF << "\n";  
 
     // Playing around
-    double quat[4] = {0.15062098347108197, 0.5321941415978229, -0.6137303006501686, 0.5633984673843319}; // Quaternion format: x, y, z, w
+    double quat[4] = {0, 0, 0, 1}; // Quaternion format: x, y, z, w
     Eigen::Map<Sophus::SO3d> rot(quat); // Mapping a quaternion rotation from double* type to Sophus::SO3d type
 
     std::cout << "Matrix:\n" << rot.matrix() << "\n"; 

@@ -42,6 +42,8 @@
 #include "ceres/ceres.h"
 #include "ceres/rotation.h"
 
+#include "eigen3/Eigen/Dense"
+
 // Read a Bundle Adjustment in the Large dataset.
 class BALProblem
 {
@@ -224,6 +226,17 @@ int main(int argc, char **argv)
                                  bal_problem.mutable_point_for_observation(i));
     }
 
+    for (int i = 0; i < 10; i++)
+    {
+
+        double *c = bal_problem.mutable_camera_for_observation(i);
+
+        Eigen::Map<Eigen::Vector3d> t_vec(c + 3, 3);
+        Eigen::Map<Eigen::Vector3d> r_vec(c, 3);
+
+        std::cout << "r: " << r_vec.transpose() << " t: " << t_vec.transpose() << "\n";
+    }
+
     // Make Ceres automatically detect the bundle structure. Note that the
     // standard solver, SPARSE_NORMAL_CHOLESKY, also works fine but it is slower
     // for standard bundle adjustment problems.
@@ -234,6 +247,20 @@ int main(int argc, char **argv)
     ceres::Solver::Summary summary;
     ceres::Solve(options, &problem, &summary);
     std::cout << summary.FullReport() << "\n";
+
+    for (int i = 0; i < 30; i++)
+    {
+        std::cout << i << ".\n";  
+
+        double *c = bal_problem.mutable_camera_for_observation(i);
+
+        Eigen::Map<Eigen::Vector3d> t_vec(c+3, 3);
+        Eigen::Map<Eigen::Vector3d> r_vec(c, 3);
+        Eigen::Map<Eigen::Vector3d> p_vec(bal_problem.mutable_point_for_observation(i));
+
+        std::cout << "r: " << r_vec.transpose() << " t: " << t_vec.transpose() << "\n";
+        std::cout << "p: " << p_vec.transpose() << "\n";
+    }
 
     return 0;
 }

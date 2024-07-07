@@ -38,24 +38,90 @@
 #include <cmath>
 #include <cstdio>
 #include <iostream>
+#include <memory>
 
 #include "ceres/ceres.h"
 #include "ceres/rotation.h"
 
 #include "eigen3/Eigen/Dense"
+#include <sophus/se3.hpp>
+#include "sophus/ceres_manifold.hpp"
 
-// Manifold Functor
-// struct SpecialOrthogonalFunctor {
-//     template <typename T>
-//     bool Plus(const T* x, const T* delta, T* x_plus_delta) const {
+struct SpecialOrthogonalGroup
+{
+    template <typename T>
+    bool Plus(const T *x, const T *delta, T *x_plus_delta) const
+    {
+        // x is a point on the manifold and its dimension is equal to the ambient size
+        // delta is the point in the tangent space and its dimension is equal to the tangent size.
+        // In the case of Special Orthogonal Lie Group, its tangent size is equal to e.
+        // x_plus_delta is the perturbed point on the manifold.
 
-//     }
+        // x is a unit quaternion in the ordering: (w,x,y,z)
+        T w = *x;
+        T i = *(x + 1);
+        T j = *(x + 2);
+        T k = *(x + 3);
+        // quaternion array with new ordering
+        T quaternion[4] = {i, j, k, w};
 
-//     template <typename T> 
-//     bool Minus(const T* y, const T* x, T* y_minus_x) {
+        // Creating an Sophus manifold object.
+        Eigen::Map<Sophus::SO3<T>> SO3_x(quaternion);
 
-//     }
-// };
+        // Creating an Eigen::Vector3d object from delta
+        T delta_x = *(delta + 0);
+        T delta_y = *(delta + 1);
+        T delta_z = *(delta + 2);
+        Eigen::Matrix<T, 3, 1> so3_delta;
+        so3_delta << delta_x, delta_y, delta_z;
+
+        // x plus delta operation
+        Sophus::SO3<T> SO3_x_plus_delta = Sophus::SO3<T>::exp(so3_delta) * SO3_x;
+
+        *(x_plus_delta + 0) = SO3_x_plus_delta.unit_quaternion().w();
+        *(x_plus_delta + 1) = SO3_x_plus_delta.unit_quaternion().x();
+        *(x_plus_delta + 2) = SO3_x_plus_delta.unit_quaternion().y();
+        *(x_plus_delta + 3) = SO3_x_plus_delta.unit_quaternion().z();
+
+        return true;
+    }
+
+    template <typename T>
+    bool Minus(const T *y, const T *x, T *y_minus_x) const
+    {
+        // x is a point on the manifold and its dimension is equal to the ambient size
+        // y is also a point on the manifold and its dimension is equal to the ambient size
+        // y_minus_x is the point in the tangent space and its dimension is equal to the tangent size.
+
+        // x and y are unit quaternions in the ordering: (w,x,y,z)
+        T x_w = *(x + 0);
+        T x_i = *(x + 1);
+        T x_j = *(x + 2);
+        T x_k = *(x + 3);
+        // inverted x quaternion array with new ordering
+        T minus_x_quaternion[4] = {-x_i, -x_j, -x_k, x_w};
+
+        T y_w = *(y + 0);
+        T y_i = *(y + 1);
+        T y_j = *(y + 2);
+        T y_k = *(y + 3);
+        // y quaternion array with new ordering
+        T y_quaternion[4] = {y_i, y_j, y_k, y_w};
+
+        // Creating Sophus objects on the manifold
+        Eigen::Map<Sophus::SO3<T>> SO3_minus_x(minus_x_quaternion);
+        Eigen::Map<Sophus::SO3<T>> SO3_y(y_quaternion);
+
+        Sophus::SO3<T> SO3_y_minus_x = SO3_y * SO3_minus_x;
+        Eigen::Matrix<T, 3, 1> y_minus_x_vector = SO3_y_minus_x.log();
+
+        *(y_minus_x + 0) = y_minus_x_vector[0];
+        *(y_minus_x + 1) = y_minus_x_vector[1];
+        *(y_minus_x + 2) = y_minus_x_vector[2];
+
+        return true;
+    }
+};
 
 // Read a Bundle Adjustment in the Large dataset.
 class BALProblem
@@ -87,7 +153,7 @@ public:
     }
 
     double* camera_rotation(int i) {
-        return camera_rotations_ + camera_index_[i] * 9; 
+        return camera_rotations_ + camera_index_[i] * 4; 
     }
 
     double* camera_translation(int i) {
@@ -96,6 +162,15 @@ public:
 
     double* camera_intrinsic(int i) {
         return camera_intrinsics_ + camera_index_[i] * 3; 
+    }
+
+    void unit_quaternion(double* quat, double* unit_quat) {
+        double norm = sqrt(pow(*quat, 2) + pow(*(quat + 1), 2) + pow(*(quat + 2), 2) + pow(*(quat + 3), 2));
+        
+        unit_quat[0] = *(quat + 0) / norm;
+        unit_quat[1] = *(quat + 1) / norm;
+        unit_quat[2] = *(quat + 2) / norm;
+        unit_quat[3] = *(quat + 3) / norm;
     }
 
     bool LoadFile(const char *filename)
@@ -136,7 +211,7 @@ public:
         }
 
         // Assigning the sizes of camera arrays
-        camera_rotations_ = new double[9*num_cameras_]; 
+        camera_rotations_ = new double[4*num_cameras_]; 
         camera_positions_ = new double[3*num_cameras_]; 
         camera_intrinsics_ = new double[3*num_cameras_]; 
 
@@ -144,11 +219,17 @@ public:
         for (int i = 0; i < num_cameras_; ++i) {
             // ------------- Extracting Rotation ------------- // 
             double angleAxis[3] = {*(parameters_ + 9*i), *(parameters_ + 9*i + 1), *(parameters_ + 9*i + 2)};
-            double rot[9];
+            double quat[4];
             // Converting Angle Axis to Rotation Matrix
-            ceres::AngleAxisToRotationMatrix(angleAxis, rot);
-            // Copying rotation matrix coefficients into camera_rotations_ array. 
-            std::copy(rot, rot+9, camera_rotations_ + 9*i);
+            ceres::AngleAxisToQuaternion(angleAxis, quat); // Given quaternion from this function has the format: w, x, y, z
+            double norm = sqrt(pow(*quat, 2) + pow(*(quat + 1), 2) + pow(*(quat + 2), 2) + pow(*(quat + 3), 2));
+            double unit_quat[4];
+            this->unit_quaternion(quat, unit_quat); 
+            // Reordering the quaterion from (w,x,y,z) -> (x,y,z,w). This is done because Eigen::Map<Sophus::SO3d> obj(quat)
+            // reads quaternion in the following ordering: x,y,z,w.
+            double reordered_unit_quat[4] = {unit_quat[1], unit_quat[2], unit_quat[3], unit_quat[0]};
+            // Copying rotation matrix coefficients into camera_rotations_ array.
+            std::copy(unit_quat, unit_quat + 4, camera_rotations_ + 4 * i);
 
             // ------------- Extracting Translation ------------- //
             std::copy(parameters_ + 9*i + 3, parameters_ + 9*i + 6, camera_positions_ + 3*i);
@@ -179,33 +260,40 @@ private:
     int *camera_index_;
     double *observations_;
     double *parameters_;
-    double *camera_rotations_;   // In rotation matrix form 
+    double *camera_rotations_;   // Quaternions
     double *camera_positions_;   // 3D vector
     double *camera_intrinsics_;  // Includes focal length, f, and distortion parameters - k1 and k2. 
 };
 
-// Templated pinhole camera model for used with Ceres.  The camera is
-// parameterized using 9 parameters: 3 for rotation, 3 for translation, 1 for
-// focal length and 2 for radial distortion. The principal point is not modeled
-// (i.e. it is assumed be located at the image center).
-struct SnavelyReprojectionError
+
+struct ReprojectionErrorFunctor
 {
-    SnavelyReprojectionError(double observed_x, double observed_y)
+    ReprojectionErrorFunctor(double observed_x, double observed_y)
         : observed_x(observed_x), observed_y(observed_y) {}
 
     template <typename T>
-    bool operator()(const T *const camera,
-                    const T *const point,
+    bool operator()(const T *const camera_translation,  // Translation component of camera
+                    const T* const camera_rotation,     // Rotation component in quaterion (x,y,z,w) 
+                    const T* const camera_intrinsics,   // Focal length, distortion parameters k1 and k2
+                    const T *const point,               // Location of 3D point
                     T *residuals) const
     {
+
+        // Reordering quaternion
+        // double ceres_quat[4];
+        // ceres_quat[0] = *(camera_rotation+3); 
+        // ceres_quat[1] = *camera_rotation; 
+        // ceres_quat[2] = *(camera_rotation+1);
+        // ceres_quat[3] = *(camera_rotation+2);  
+
         // camera[0,1,2] are the angle-axis rotation.
         T p[3];
-        ceres::AngleAxisRotatePoint(camera, point, p);
+        ceres::QuaternionRotatePoint(camera_rotation, point, p); 
 
-        // camera[3,4,5] are the translation.
-        p[0] += camera[3];
-        p[1] += camera[4];
-        p[2] += camera[5];
+        // Translating the point
+        p[0] += camera_translation[0];
+        p[1] += camera_translation[1];
+        p[2] += camera_translation[2];
 
         // Compute the center of distortion. The sign change comes from
         // the camera model that Noah Snavely's Bundler assumes, whereby
@@ -214,13 +302,13 @@ struct SnavelyReprojectionError
         T yp = -p[1] / p[2];
 
         // Apply second and fourth order radial distortion.
-        const T &l1 = camera[7];
-        const T &l2 = camera[8];
+        const T &l1 = camera_intrinsics[1];
+        const T &l2 = camera_intrinsics[2];
         T r2 = xp * xp + yp * yp;
         T distortion = 1.0 + r2 * (l1 + l2 * r2);
 
         // Compute final projected point position.
-        const T &focal = camera[6];
+        const T &focal = camera_intrinsics[0];
         T predicted_x = focal * distortion * xp;
         T predicted_y = focal * distortion * yp;
 
@@ -236,8 +324,8 @@ struct SnavelyReprojectionError
     static ceres::CostFunction *Create(const double observed_x,
                                        const double observed_y)
     {
-        return (new ceres::AutoDiffCostFunction<SnavelyReprojectionError, 2, 9, 3>(
-            new SnavelyReprojectionError(observed_x, observed_y)));
+        return (new ceres::AutoDiffCostFunction<ReprojectionErrorFunctor, 2, 3, 4, 3, 3>(
+            new ReprojectionErrorFunctor(observed_x, observed_y)));
     }
 
     double observed_x;
@@ -265,17 +353,25 @@ int main(int argc, char **argv)
     // Create residuals for each observation in the bundle adjustment problem. The
     // parameters for cameras and points are added automatically.
     ceres::Problem problem;
+
+    // ceres::QuaternionManifold manifold = ceres::QuaternionManifold();
+    ceres::Manifold *manifold = new ceres::AutoDiffManifold<SpecialOrthogonalGroup, 4, 3>;
+
     for (int i = 0; i < bal_problem.num_observations(); ++i)
     {
         // Each Residual block takes a point and a camera as input and outputs a 2
         // dimensional residual. Internally, the cost function stores the observed
         // image location and compares the reprojection against the observation.
 
-        ceres::CostFunction *cost_function = SnavelyReprojectionError::Create(
+        ceres::CostFunction *cost_function = ReprojectionErrorFunctor::Create(
             observations[2 * i + 0], observations[2 * i + 1]);
+
+        problem.AddParameterBlock(bal_problem.camera_rotation(i), 4, manifold); 
         problem.AddResidualBlock(cost_function,
                                  nullptr /* squared loss */,
-                                 bal_problem.mutable_camera_for_observation(i),
+                                 bal_problem.camera_translation(i),
+                                 bal_problem.camera_rotation(i),
+                                 bal_problem.camera_intrinsic(i),
                                  bal_problem.mutable_point_for_observation(i));
     }
 
@@ -290,66 +386,7 @@ int main(int argc, char **argv)
     ceres::Solve(options, &problem, &summary);
     std::cout << summary.FullReport() << "\n";
 
-    // Playing around with code
-
-    // for (int i = 3; i < 8; i++) {
-    //     double *myArray = bal_problem.mutable_camera_for_observation(i);
-
-    //     // Converting Angle-Axis rotation to rotation matrix
-    //     double angleAxis[3] = {*myArray, *(myArray + 1), *(myArray + 2)};
-    //     double Rot[9];
-
-    //     ceres::AngleAxisToRotationMatrix(angleAxis, Rot);
-
-    //     for (int j = 0; j < 9; j++)
-    //     {
-    //         std::cout << *(myArray + j) << " ";
-    //     }
-    //     std::cout << "Rotation Matrix:\n"; 
-    //     for (int j = 0; j < 9; j++)
-    //     {
-    //         std::cout << Rot[j] << " ";
-    //     }
-
-    //     Eigen::Matrix<double, 3, 3, Eigen::RowMajor> R; 
-    //     R << 
-    //     Rot[0], Rot[3], Rot[6], 
-    //     Rot[1], Rot[4], Rot[7], 
-    //     Rot[2], Rot[5], Rot[8]; 
-
-    //     std::cout << "\nR: \n" << R; 
-
-    //     std::cout << "\n\n";
-    // }
-
-    for (int i = 5; i < 10; ++i) {
-        double* param = bal_problem.mutable_camera_for_observation(i);
-        std::cout << "Angle Axis: " << *param << " " << *(param+1) << " " << *(param+2) << "\n"; 
-
-        double* rot = bal_problem.camera_rotation(i);
-        Eigen::Matrix<double, 3, 3, Eigen::RowMajor> R;
-        R <<
-        rot[0], rot[3], rot[6],
-        rot[1], rot[4], rot[7],
-        rot[2], rot[5], rot[8];
-
-        std::cout << "R:\n" << R << "\n"; 
-
-        double* t = bal_problem.camera_translation(i); 
-        Eigen::Map<Eigen::Vector3d> t_(t); 
-        std::cout << "t:\n" << t_ << "\n"; 
-
-
-
-        double* intrinsic_params = bal_problem.camera_intrinsic(i); 
-        double f = *intrinsic_params; 
-        double k1 = *(intrinsic_params+1);
-        double k2 = *(intrinsic_params + 2);
-
-        std::cout << "f: " << f << " k1: " << k1 << " k2: " << k2 << std::endl; 
-    }
-
-
+    // delete manifold; 
 
     return 0;
 }
